@@ -1,128 +1,166 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import "./App.css";
 
 const FALLBACK_CONTACTS = [
     {
         id: 1,
-        name: "Ada Lovelace",
-        phone: "(555) 010-0101",
-        email: "ada@example.com",
+        name: "James Bond",
+        phone: "007-000-0001",
+        email: "james.bond1@mi6.co.uk",
+        photo: "https://i.pinimg.com/736x/bf/00/75/bf0075ba6468135d6397dbd4676c288b.jpg",
     },
     {
         id: 2,
-        name: "Alan Turing",
-        phone: "(555) 010-0102",
-        email: "alan@example.com",
+        name: "James Bond",
+        phone: "007-000-0002",
+        email: "james.bond2@mi6.co.uk",
+        photo: "https://i.pinimg.com/736x/bf/00/75/bf0075ba6468135d6397dbd4676c288b.jpg",
     },
     {
         id: 3,
-        name: "Grace Hopper",
-        phone: "(555) 010-0103",
-        email: "grace@example.com",
+        name: "James Bond",
+        phone: "007-000-0003",
+        email: "james.bond3@mi6.co.uk",
+        photo: "https://i.pinimg.com/736x/bf/00/75/bf0075ba6468135d6397dbd4676c288b.jpg",
+    },
+    {
+        id: 4,
+        name: "James Bond",
+        phone: "007-000-0004",
+        email: "james.bond4@mi6.co.uk",
+        photo: "https://i.pinimg.com/736x/bf/00/75/bf0075ba6468135d6397dbd4676c288b.jpg",
+    },
+    {
+        id: 5,
+        name: "James Bond",
+        phone: "007-000-0005",
+        email: "james.bond5@mi6.co.uk",
+        photo: "https://i.pinimg.com/736x/bf/00/75/bf0075ba6468135d6397dbd4676c288b.jpg",
+    },
+    {
+        id: 6,
+        name: "James Bond",
+        phone: "007-000-0006",
+        email: "james.bond6@mi6.co.uk",
+        photo: "https://i.pinimg.com/736x/bf/00/75/bf0075ba6468135d6397dbd4676c288b.jpg",
+    },
+    {
+        id: 7,
+        name: "James Bond",
+        phone: "007-000-0007",
+        email: "james.bond7@mi6.co.uk",
+        photo: "https://i.pinimg.com/736x/bf/00/75/bf0075ba6468135d6397dbd4676c288b.jpg",
+    },
+    {
+        id: 8,
+        name: "James Bond",
+        phone: "007-000-0008",
+        email: "james.bond8@mi6.co.uk",
+        photo: "https://i.pinimg.com/736x/bf/00/75/bf0075ba6468135d6397dbd4676c288b.jpg",
+    },
+    {
+        id: 9,
+        name: "James Bond",
+        phone: "007-000-0009",
+        email: "james.bond9@mi6.co.uk",
+        photo: "https://i.pinimg.com/736x/bf/00/75/bf0075ba6468135d6397dbd4676c288b.jpg",
+    },
+    {
+        id: 10,
+        name: "James Bond",
+        phone: "007-000-0010",
+        email: "james.bond10@mi6.co.uk",
+        photo: "https://i.pinimg.com/736x/bf/00/75/bf0075ba6468135d6397dbd4676c288b.jpg",
     },
 ];
 
 const App = () => {
     const [contacts, setContacts] = useState(FALLBACK_CONTACTS);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-
-    useEffect(() => {}, []);
-
-    const [query, setQuery] = useState("");
-
     const [form, setForm] = useState({ name: "", phone: "", email: "" });
-    function handleSubmit(e) {
+
+    const handleSubmit = (e) => {
         e.preventDefault();
-        // Add contact submission logic here
-    }
+        if (!form.name || !form.phone) return;
+
+        const newContact = {
+            id: Date.now(),
+            name: form.name,
+            phone: form.phone,
+            email: form.email || "N/A",
+            photo: "https://i.pinimg.com/736x/bf/00/75/bf0075ba6468135d6397dbd4676c288b.jpg",
+        };
+
+        setContacts([newContact, ...contacts]);
+        setForm({ name: "", phone: "", email: "" });
+    };
 
     return (
-        <main className="page" data-testid="page-root">
-            <header className="page__header">
-                <h1 className="page__title">Phonebook Challenge</h1>
-                <p className="page__subtitle">Build a simple contact directory</p>
+        <main>
+            <header>
+                <h1>Phonebook Challenge</h1>
+                <p>A simple contact directory</p>
             </header>
 
-            <section className="search" aria-labelledby="search-heading">
-                <h2 id="search-heading">Search Contacts</h2>
-                <div className="search__controls">
-                    <label htmlFor="search-input">Search</label>
-                    <input
-                        id="search-input"
-                        type="search"
-                        placeholder="Search by name or phone"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        data-testid="search-input"
-                    />
-                </div>
-
-                <p className="search__results" data-testid="results-count">
-                    Showing {contacts.length}{" "}
-                    {contacts.length === 1 ? "result" : "results"}
-                    {loading ? " (loading...)" : ""}
-                    {error ? ` (error: ${error})` : ""}
-                </p>
+            <section>
+                <h2>Contacts</h2>
+                <ul>
+                    {contacts.map((contact) => (
+                        <li key={contact.id}>
+                            <article>
+                                <img
+                                    src={contact.photo}
+                                    alt={`Portrait of ${contact.name}`}
+                                    width="64"
+                                    height="64"
+                                    style={{ borderRadius: "50%" }}
+                                />
+                                <h3>{contact.name}</h3>
+                                <p>Phone: {contact.phone}</p>
+                                <p>Email: {contact.email}</p>
+                            </article>
+                        </li>
+                    ))}
+                </ul>
             </section>
 
-            <section className="contacts" aria-labelledby="contacts-heading">
-                <h2 id="contacts-heading">Contacts</h2>
-            </section>
-
-            <section className="form" aria-labelledby="form-heading">
-                <h2 id="form-heading">Add a Contact</h2>
-                <form className="form__body" onSubmit={handleSubmit} noValidate>
-                    <div className="field">
+            <section>
+                <h2>Add a Contact</h2>
+                <form onSubmit={handleSubmit}>
+                    <div>
                         <label htmlFor="name">Name</label>
                         <input
                             id="name"
-                            name="name"
                             value={form.name}
                             onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            placeholder="Enter full name"
                             required
-                            minLength={2}
                         />
                     </div>
-                    <div className="field">
+                    <div>
                         <label htmlFor="phone">Phone</label>
                         <input
                             id="phone"
-                            name="phone"
-                            inputMode="tel"
-                            placeholder="(555) 555-5555"
                             value={form.phone}
-                            onChange={(e) =>
-                                setForm({ ...form, phone: e.target.value })
-                            }
+                            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                            placeholder="Enter phone number"
                             required
                         />
                     </div>
-                    <div className="field">
+                    <div>
                         <label htmlFor="email">Email</label>
                         <input
                             id="email"
-                            name="email"
-                            type="email"
                             value={form.email}
-                            onChange={(e) =>
-                                setForm({ ...form, email: e.target.value })
-                            }
+                            onChange={(e) => setForm({ ...form, email: e.target.value })}
+                            placeholder="Enter email (optional)"
                         />
                     </div>
-                    <div className="form__actions">
-                        <button className="btn" type="submit" data-testid="btn-add">
-                            Add Contact
-                        </button>
-                    </div>
+                    <button type="submit">Add Contact</button>
                 </form>
             </section>
 
-            <footer className="page__footer">
-                <small>
-                    Starter provided. Complete tasks per README and make this page
-                    shine.
-                </small>
+            <footer>
+                <p>&copy; 2025 Phonebook Challenge</p>
             </footer>
         </main>
     );
