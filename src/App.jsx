@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
+import Contact from "./components/Contact/Contact.jsx";
 
 const AVATAR = "https://img.freepik.com/free-vector/blue-circle-with-white-user_78370-4707.jpg?semt=ais_hybrid&w=740&q=80";
 
@@ -13,152 +14,198 @@ const FALLBACK_CONTACTS = [
 	{ id: 7,  name: "Maleficent",       phone: "555-000-0007", email: "maleficent@villains.dev",     photo: AVATAR },
 	{ id: 8,  name: "Scar",             phone: "555-000-0008", email: "scar@villains.dev",           photo: AVATAR },
 	{ id: 9,  name: "Ursula",           phone: "555-000-0009", email: "ursula@villains.dev",         photo: AVATAR },
-	{ id: 10, name: "Sauron",           phone: "555-000-0010", email: "sauron@villains.dev",         photo: AVATAR },
+	{ id: 10, name: "Sauron",           phone: "555-000-0010", email: "sauron@villains.dev",         photo: AVATAR }
 ];
 
-const PLACEHOLDER_PHOTO = AVATAR;
+const STORAGE_KEY = "contacts_v1";
 
 const App = () => {
-	const [contacts, setContacts] = useState(FALLBACK_CONTACTS);
+	const [contacts, setContacts] = useState([]);
+	const [status, setStatus] = useState("idle"); // idle|loading|ready|error
+	const [error, setError] = useState("");
 	const [query, setQuery] = useState("");
 	const [form, setForm] = useState({ name: "", phone: "", email: "" });
-	const [currentPage, setCurrentPage] = useState(1);
+	const [touched, setTouched] = useState({});
+	const [submitting, setSubmitting] = useState(false);
+	const [page, setPage] = useState(1);
 
-	const filteredContacts = useMemo(() => {
+	// Load from localStorage then fetch remote
+	useEffect(() => {
+		let cancelled = false;
+		const stored = (() => {
+			try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+			catch { return []; }
+		})();
+		if (stored.length) setContacts(stored);
+		const load = async () => {
+			setStatus("loading");
+			try {
+				const res = await fetch("/data/contacts.json", { cache: "no-store" });
+				if (!res.ok) throw new Error("Network error");
+				const data = await res.json();
+				if (cancelled) return;
+				const withPhotos = data.map(c => ({ ...c, photo: AVATAR }));
+				if (!stored.length) setContacts(withPhotos);
+				else {
+					// Merge any new remote contacts not in stored (by id)
+						const existingIds = new Set(stored.map(c => c.id));
+						const merged = [...stored, ...withPhotos.filter(c => !existingIds.has(c.id))];
+						setContacts(merged);
+				}
+				setStatus("ready");
+			} catch (e) {
+				if (cancelled) return;
+				setError("Fetch failed. Using fallback list.");
+				if (!stored.length) setContacts(FALLBACK_CONTACTS);
+				setStatus("error");
+			}
+		};
+		load();
+		return () => { cancelled = true; };
+	}, []);
+
+	// Persist
+	useEffect(() => {
+		if (contacts.length) {
+			try { localStorage.setItem(STORAGE_KEY, JSON.stringify(contacts)); } catch {}
+		}
+	}, [contacts]);
+
+	const filtered = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		if (!q) return contacts;
-		return contacts.filter((c) => {
-			const email = c.email || "";
-			return (
-				c.name.toLowerCase().includes(q) ||
-				c.phone.toLowerCase().includes(q) ||
-				email.toLowerCase().includes(q)
-			);
-		});
+		return contacts.filter(c =>
+			c.name.toLowerCase().includes(q) ||
+			c.phone.toLowerCase().includes(q)
+		);
 	}, [contacts, query]);
 
-	const totalPages = Math.max(1, filteredContacts.length);
-	// clamp currentPage when filteredContacts changes
+	// Pagination: one per page
+	const totalPages = filtered.length || 1;
 	useEffect(() => {
-		if (currentPage > totalPages) setCurrentPage(1);
-	}, [filteredContacts, totalPages, currentPage]);
+		if (page > totalPages) setPage(1);
+	}, [filtered, totalPages, page]);
 
-	const currentContact = filteredContacts.length ? filteredContacts[currentPage - 1] : null;
+	const currentContact = filtered[page - 1];
 
+	// Validation
+	const nameErr = touched.name && (!form.name.trim() ? "Name required" :
+		form.name.trim().length < 2 ? "Min 2 chars" : "");
+	const phoneErr = touched.phone && (!form.phone.trim() ? "Phone required" : "");
+	const emailErr = touched.email && (form.email && !/@/.test(form.email) ? "Invalid email" : "");
+	const formValid = !nameErr && !phoneErr && !emailErr &&
+		form.name.trim().length >= 2 && form.phone.trim() &&
+		(!form.email || /@/.test(form.email));
+
+	function handleChange(e) {
+		const { name, value } = e.target;
+		setForm(f => ({ ...f, [name]: value }));
+	}
+	function handleBlur(e) {
+		setTouched(t => ({ ...t, [e.target.name]: true }));
+	}
 	function handleSubmit(e) {
 		e.preventDefault();
-		const { name, phone, email } = form;
-		if (!name.trim() || !phone.trim()) return;
+		setTouched({ name: true, phone: true, email: true });
+		if (!formValid) return;
+		setSubmitting(true);
 		const newContact = {
 			id: Date.now(),
-			name: name.trim(),
-			phone: phone.trim(),
-			email: (email || "").trim(),
-			photo: AVATAR,
+			name: form.name.trim(),
+			phone: form.phone.trim(),
+			email: form.email.trim(),
+			photo: AVATAR
 		};
-		setContacts((prev) => [newContact, ...prev]);
+		setContacts(prev => [newContact, ...prev]);
 		setForm({ name: "", phone: "", email: "" });
-		setCurrentPage(1);
+		setTouched({});
+		setPage(1);
+		setSubmitting(false);
 	}
 
-	function goPrev() {
-		setCurrentPage((p) => Math.max(1, p - 1));
-	}
-
-	function goNext() {
-		setCurrentPage((p) => Math.min(totalPages, p + 1));
-	}
+	function prev() { setPage(p => Math.max(1, p - 1)); }
+	function next() { setPage(p => Math.min(totalPages, p + 1)); }
 
 	return (
-		<main className="page" data-testid="page-root">
+		<main className="page">
 			<header className="page__header">
-				<h1 className="page__title">Phonebook Challenge</h1>
-				<p className="page__subtitle">A simple contact directory</p>
+				<h1 className="page__title">Villain Directory</h1>
+				<p className="page__subtitle">
+					{status === "loading" && "Loading contacts..."}
+					{status === "ready" && "Contacts loaded"}
+					{status === "error" && error}
+				</p>
 			</header>
 
 			<section className="search" aria-labelledby="search-heading">
-				<h2 id="search-heading">Search Contacts</h2>
+				<h2 id="search-heading" style={{margin:"0 0 .5rem"}}>Search</h2>
 				<div className="search__controls">
-					<label htmlFor="search-input">Search</label>
+					<label htmlFor="search-input">Name or Phone</label>
 					<input
 						id="search-input"
 						type="search"
-						placeholder="Search by name, phone, or email"
+						placeholder="Type to filter..."
 						value={query}
-						onChange={(e) => { setQuery(e.target.value); setCurrentPage(1); }}
-						data-testid="search-input"
+						onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+						disabled={status === "loading"}
 					/>
 				</div>
-				<p className="search__results" data-testid="results-count">
-					Showing {filteredContacts.length} {filteredContacts.length === 1 ? "result" : "results"}
+				<p className="search__results">
+					{filtered.length} result{filtered.length !== 1 && "s"}
 				</p>
 			</section>
 
 			<section className="contacts" aria-labelledby="contacts-heading">
-				<h2 id="contacts-heading">Contacts</h2>
-
+				<h2 id="contacts-heading" style={{margin:"1.75rem 0 .75rem"}}>Contacts</h2>
 				<ul className="contacts__grid">
 					{currentContact ? (
-						<li key={currentContact.id}>
-							<article className="contact-card">
-								<img
-									src={currentContact.photo || PLACEHOLDER_PHOTO}
-									alt={`Portrait of ${currentContact.name}`}
-									width={120}
-									height={120}
-									onError={(e) => { e.currentTarget.src = PLACEHOLDER_PHOTO; }}
-								/>
-								<div className="contact-card__body">
-									<h3 className="contact-card__name">{currentContact.name}</h3>
-									<p className="contact-card__phone">Phone: {currentContact.phone}</p>
-									<p className="contact-card__email">Email: {currentContact.email || "—"}</p>
-								</div>
-							</article>
+						<li key={currentContact.id} style={{listStyle:"none", width:"100%"}}>
+							<Contact {...currentContact} />
 						</li>
 					) : (
-						<li>No contacts found.</li>
+						status === "loading" ? <li>Loading…</li> : <li>No matches.</li>
 					)}
 				</ul>
-
-				<div className="pagination" aria-label="Pagination controls">
-					<button onClick={goPrev} disabled={currentPage <= 1} aria-label="Previous contact" className="btn">
-						Previous
-					</button>
-					<span style={{ margin: "0 0.75rem", alignSelf: "center" }}>
-						Page {currentPage} of {totalPages}
-					</span>
-					<button onClick={goNext} disabled={currentPage >= totalPages} aria-label="Next contact" className="btn">
-						Next
-					</button>
+				<div className="pagination">
+					<button className="btn" onClick={prev} disabled={page <= 1}>Previous</button>
+					<span style={{color:"#9ca3af"}}>Page {page} of {totalPages}</span>
+            <button className="btn" onClick={next} disabled={page >= totalPages}>Next</button>
 				</div>
 			</section>
 
-			<section className="form" aria-labelledby="form-heading">
-				<h2 id="form-heading">Add a Contact</h2>
+			<section className="form" aria-labelledby="add-heading">
+				<h2 id="add-heading" style={{margin:"2rem 0 .75rem"}}>Add Contact</h2>
 				<form className="form__body" onSubmit={handleSubmit} noValidate>
 					<div className="field">
-						<label htmlFor="name">Name</label>
+						<label htmlFor="name">Name *</label>
 						<input
 							id="name"
 							name="name"
-							placeholder="Full name"
 							value={form.name}
-							onChange={(e) => setForm({ ...form, name: e.target.value })}
-							required
+							onChange={handleChange}
+							onBlur={handleBlur}
 							minLength={2}
+							required
+							aria-invalid={!!nameErr}
+							aria-describedby={nameErr ? "err-name" : undefined}
+							placeholder="Villain name"
 						/>
+						{nameErr && <small id="err-name" className="err">{nameErr}</small>}
 					</div>
 					<div className="field">
-						<label htmlFor="phone">Phone</label>
+						<label htmlFor="phone">Phone *</label>
 						<input
 							id="phone"
 							name="phone"
-							inputMode="tel"
-							placeholder="(555) 555-5555"
 							value={form.phone}
-							onChange={(e) => setForm({ ...form, phone: e.target.value })}
+							onChange={handleChange}
+							onBlur={handleBlur}
 							required
+							aria-invalid={!!phoneErr}
+							aria-describedby={phoneErr ? "err-phone" : undefined}
+							placeholder="Contact number"
 						/>
+						{phoneErr && <small id="err-phone" className="err">{phoneErr}</small>}
 					</div>
 					<div className="field">
 						<label htmlFor="email">Email</label>
@@ -166,19 +213,25 @@ const App = () => {
 							id="email"
 							name="email"
 							type="email"
-							placeholder="name@example.com"
 							value={form.email}
-							onChange={(e) => setForm({ ...form, email: e.target.value })}
+							onChange={handleChange}
+							onBlur={handleBlur}
+							aria-invalid={!!emailErr}
+							aria-describedby={emailErr ? "err-email" : undefined}
+							placeholder="evil@domain.dev"
 						/>
+						{emailErr && <small id="err-email" className="err">{emailErr}</small>}
 					</div>
 					<div className="form__actions">
-						<button className="btn" type="submit" data-testid="btn-add">Add Contact</button>
+						<button className="btn" type="submit" disabled={submitting || status === "loading"}>
+							{submitting ? "Adding..." : "Add Contact"}
+						</button>
 					</div>
 				</form>
 			</section>
 
 			<footer className="page__footer">
-				<small>Starter provided. Complete tasks per README and make this page shine.</small>
+				<small>Sections 3 & 4 implemented (pagination, data, search, add, validation).</small>
 			</footer>
 		</main>
 	);
